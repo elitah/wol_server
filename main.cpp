@@ -362,12 +362,51 @@ static void sigHandleFunc(int sig)
 	}
 }
 
-int main(int argc, char **argv)
+static int deamon_create(bool print = true)
 {
-	int oc = 0;
+	int i = 0;
 
-	unsigned short port = 50173;
+	int fd[3] = {0, 0, 0};
 
+	if(0 == fork())
+	{
+		setsid();
+
+		if(0 == fork())
+		{
+			setsid();
+
+			chdir("/");
+			umask(0);
+
+			if(true == print)
+			{
+				return 0;
+			}
+			else
+			{
+				for(i = 0; i < 1024; i++)
+				{
+					close(i);
+				}
+
+				fd[0] = open("/dev/null", O_RDWR);
+				fd[1] = dup(0);
+				fd[2] = dup(0);
+
+				if(0 == fd[0] && 1 == fd[1] && 2 == fd[2])
+				{
+					return 0;
+				}
+			}
+		}
+	}
+
+	return -1;
+}
+
+int doMainFunc(unsigned short port)
+{
 	Lib_Epoll *epoll = NULL;
 
 	struct client_info *client_list = NULL;
@@ -376,29 +415,6 @@ int main(int argc, char **argv)
 
 	unsigned long long int timestamp = 0;
 	unsigned long long int timestamp_checktimeout = 0;
-
-	if(1 < argc)
-	{
-		while(0 < (oc = getopt(argc, argv, "p:")))
-		{
-			switch(oc)
-			{
-				case 'p':
-					port = (unsigned short)strtoul(optarg, NULL, 0);
-					if(0 == port)
-					{
-						goto out;
-					}
-					break;
-				case '?':
-					goto out;
-					break;
-				case ':':
-					goto out;
-					break;
-			}
-		}
-	}
 
 	signal(SIGINT, sigHandleFunc);
 	signal(SIGQUIT, sigHandleFunc);
@@ -496,5 +512,53 @@ out1:
 out:
 	printf("[Main] Exit\n");
 
+	return 0;
+}
+
+int main(int argc, char **argv)
+{
+	int oc = 0;
+
+	unsigned short port = 50173;
+
+	bool foreground = false;
+
+	if(1 < argc)
+	{
+		while(0 < (oc = getopt(argc, argv, "fp:")))
+		{
+			switch(oc)
+			{
+				case 'f':
+					foreground = true;
+					break;
+				case 'p':
+					port = (unsigned short)strtoul(optarg, NULL, 0);
+					if(0 == port)
+					{
+						goto out;
+					}
+					break;
+				case '?':
+					goto out;
+					break;
+				case ':':
+					goto out;
+					break;
+			}
+		}
+	}
+
+	if(true != foreground)
+	{
+		if(0 != deamon_create(foreground))
+		{
+			return 0;
+		}
+	}
+
+	return doMainFunc(port);
+
+out:
 	return 0;
 }
