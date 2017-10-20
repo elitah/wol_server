@@ -30,7 +30,7 @@ struct client_info
 
 	unsigned long long int timestamp;
 
-	char key[32];
+	char key[16];
 };
 
 static bool exit_flag = false;
@@ -169,6 +169,29 @@ static void handle_socket(void *arg, int fd)
 										snprintf(client_list[fd].key, sizeof(client_list[fd].key), "%s", key);
 									}
 								}
+							}
+							else if(0 == strcmp(cmd, "client_list"))
+							{
+								str += "[";
+
+								for(unsigned int i = 0; 1024 > i; i++)
+								{
+									if(true == client_list[i].enable && true == client_list[i].esp8266)
+									{
+										if(1 < str.size())
+										{
+											str += ",";
+										}
+
+										str += "\"";
+										str += client_list[i].key;
+										str += "\"";
+									}
+								}
+
+								str += "]";
+
+								ret_to_client = true;
 							}
 							else if(0 == strcmp(cmd, "wol"))
 							{
