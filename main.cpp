@@ -31,6 +31,9 @@ struct client_info
 	unsigned long long int timestamp;
 
 	char key[16];
+	char ssid[32];
+	char lan_ip[16];
+	char global_ip[16];
 };
 
 static bool exit_flag = false;
@@ -58,7 +61,10 @@ static void handle_socket(void *arg, int fd)
 
 	if(true == epoll->checkListen(fd))
 	{
-		tmp_fd = accept(fd, NULL, NULL);
+		struct sockaddr_in remote_addr;
+		socklen_t len = sizeof(remote_addr);
+
+		tmp_fd = accept(fd, (struct sockaddr *)&remote_addr, &len);
 
 		if(0 <= tmp_fd)
 		{
@@ -78,6 +84,10 @@ static void handle_socket(void *arg, int fd)
 					client_list[tmp_fd].timestamp = getTimestamp() + 10000000;
 
 					memset(client_list[tmp_fd].key, 0, sizeof(client_list[tmp_fd].key));
+					memset(client_list[tmp_fd].ssid, 0, sizeof(client_list[tmp_fd].ssid));
+					memset(client_list[tmp_fd].lan_ip, 0, sizeof(client_list[tmp_fd].lan_ip));
+
+					snprintf(client_list[tmp_fd].global_ip, sizeof(client_list[tmp_fd].global_ip), "%s", inet_ntoa(remote_addr.sin_addr));
 				}
 			}
 		}
@@ -134,6 +144,8 @@ static void handle_socket(void *arg, int fd)
 		{
 			if(0 < str.size())
 			{
+				printf("recv: %s\n", str.c_str());
+
 				if(NULL== client_list)
 				{
 					str.clear();
@@ -157,16 +169,22 @@ static void handle_socket(void *arg, int fd)
 							if(0 == strcmp(cmd, "bind"))
 							{
 								char key[32] = {0};
+								char ssid[32] = {0};
+								char ip[32] = {0};
 
-								if(true == json_recv->getValueString("key", key, sizeof(key)))
+								if(true == json_recv->getValueString("key", key, sizeof(key)) \
+									&& true == json_recv->getValueString("ssid", ssid, sizeof(ssid)) \
+									&& true == json_recv->getValueString("ip", ip, sizeof(ip)))
 								{
-									if(0 < strlen(key))
+									if(0 < strlen(key) && 0 < strlen(ssid) && 0 < strlen(ip))
 									{
-										ret_to_client = true;
-
 										client_list[fd].esp8266 = true;
 
 										snprintf(client_list[fd].key, sizeof(client_list[fd].key), "%s", key);
+										snprintf(client_list[fd].ssid, sizeof(client_list[fd].ssid), "%s", ssid);
+										snprintf(client_list[fd].lan_ip, sizeof(client_list[fd].lan_ip), "%s", ip);
+
+										ret_to_client = true;
 									}
 								}
 							}
@@ -183,9 +201,15 @@ static void handle_socket(void *arg, int fd)
 											str += ",";
 										}
 
-										str += "\"";
+										str += "{\"key\":\"";
 										str += client_list[i].key;
-										str += "\"";
+										str += "\",\"ssid\":\"";
+										str += client_list[i].ssid;
+										str += "\",\"lan_ip\":\"";
+										str += client_list[i].lan_ip;
+										str += "\",\"global_ip\":\"";
+										str += client_list[i].global_ip;
+										str += "\"}";
 									}
 								}
 
