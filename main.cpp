@@ -98,7 +98,7 @@ static void handle_socket(void *arg, int fd)
 
 		char buffer[32 * 1024] = {0};
 
-		std::string str;
+		std::string str_recv, str_send;
 
 		bool ret_to_client = false;
 
@@ -114,7 +114,7 @@ static void handle_socket(void *arg, int fd)
 			{
 				buffer[ret] = 0;
 
-				str += buffer;
+				str_recv += buffer;
 			}
 			// 对端已关闭
 			else if(0 == ret)
@@ -142,19 +142,13 @@ static void handle_socket(void *arg, int fd)
 
 		if(0 <= fd)
 		{
-			if(0 < str.size())
+			if(0 < str_recv.size())
 			{
-				printf("recv: %s\n", str.c_str());
+				printf("recv: %s\n", str_recv.c_str());
 
-				if(NULL== client_list)
+				if(NULL != client_list)
 				{
-					str.clear();
-				}
-				else
-				{
-					Lib_Json *json_recv = Lib_Json::getObject(str.c_str(), str.size());
-
-					str.clear();
+					Lib_Json *json_recv = Lib_Json::getObject(str_recv.c_str(), str_recv.size());
 
 					if(NULL != json_recv)
 					{
@@ -190,30 +184,30 @@ static void handle_socket(void *arg, int fd)
 							}
 							else if(0 == strcmp(cmd, "client_list"))
 							{
-								str += "[";
+								str_send += "[";
 
 								for(unsigned int i = 0; 1024 > i; i++)
 								{
 									if(true == client_list[i].enable && true == client_list[i].esp8266)
 									{
-										if(1 < str.size())
+										if(1 < str_send.size())
 										{
-											str += ",";
+											str_send += ",";
 										}
 
-										str += "{\"key\":\"";
-										str += client_list[i].key;
-										str += "\",\"ssid\":\"";
-										str += client_list[i].ssid;
-										str += "\",\"lan_ip\":\"";
-										str += client_list[i].lan_ip;
-										str += "\",\"global_ip\":\"";
-										str += client_list[i].global_ip;
-										str += "\"}";
+										str_send += "{\"key\":\"";
+										str_send += client_list[i].key;
+										str_send += "\",\"ssid\":\"";
+										str_send += client_list[i].ssid;
+										str_send += "\",\"lan_ip\":\"";
+										str_send += client_list[i].lan_ip;
+										str_send += "\",\"global_ip\":\"";
+										str_send += client_list[i].global_ip;
+										str_send += "\"}";
 									}
 								}
 
-								str += "]";
+								str_send += "]";
 
 								ret_to_client = true;
 							}
@@ -279,7 +273,7 @@ static void handle_socket(void *arg, int fd)
 				}
 			}
 
-			ret = snprintf(buffer, sizeof(buffer), JSON_RET_STR, ret_to_client ? "true" : "false", 0 < str.size() ? str.c_str() : "null");
+			ret = snprintf(buffer, sizeof(buffer), JSON_RET_STR, ret_to_client ? "true" : "false", 0 < str_send.size() ? str_send.c_str() : "null");
 
 			if(0 < ret)
 			{
