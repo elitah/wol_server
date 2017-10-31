@@ -41,8 +41,9 @@ private:
 
 	int m_fd;
 
-	int m_count;
 	struct epoll_event *m_events;
+
+	int m_count;
 
 	unsigned int m_nums;
 

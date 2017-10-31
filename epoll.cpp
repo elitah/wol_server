@@ -15,8 +15,8 @@
 
 Lib_Epoll::Lib_Epoll(void)
 	: m_fd(-1)
-	, m_count(0)
 	, m_events(NULL)
+	, m_count(0)
 	, m_nums(0)
 	, m_listen(-1)
 	, m_ptr(NULL)

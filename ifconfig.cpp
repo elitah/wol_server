@@ -241,9 +241,9 @@ bool Lib_IfConfig::getDefaultRoute(const char *ifname, in_addr_t *data)
 				if(0 == dst && 0x2 == (flag & 0x2))
 				{
 					*data = gate;
-					
+
 					ret = true;
-					
+
 					break;
 				}
 			}
@@ -445,5 +445,59 @@ out1:
 	}
 out:
 	return ret;
+}
+
+int Lib_IfConfig::socket_listen_on(int type, unsigned short port)
+{
+	int listen_fd = -1;
+
+	struct sockaddr_in local_addr;
+
+	if(SOCK_STREAM != type && SOCK_DGRAM != type)
+	{
+		goto out;
+	}
+
+	listen_fd = socket(AF_INET, type, 0);
+
+	if(0 > listen_fd)
+	{
+		goto out;
+	}
+
+	if(0 != setSocketReUseAddr(listen_fd))
+	{
+		goto out1;
+	}
+
+	memset(&local_addr, 0, sizeof(local_addr));
+
+	local_addr.sin_family = AF_INET;
+	local_addr.sin_port = htons(port);
+	local_addr.sin_addr.s_addr = INADDR_ANY;
+
+	if(0 != bind(listen_fd, (struct sockaddr *)&local_addr, sizeof(local_addr)))
+	{
+		goto out1;
+	}
+
+	if(SOCK_STREAM == type)
+	{
+		if(0 != listen(listen_fd, 5))
+		{
+			goto out1;
+		}
+	}
+
+	goto out;
+
+out1:
+	if(0 <= listen_fd)
+	{
+		close(listen_fd);
+		listen_fd = -1;
+	}
+out:
+	return listen_fd;
 }
 #endif

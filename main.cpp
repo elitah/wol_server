@@ -184,30 +184,45 @@ static void handle_socket(void *arg, int fd)
 							}
 							else if(0 == strcmp(cmd, "client_list"))
 							{
+								unsigned int count = 0;
+
 								str_send += "[";
 
 								for(unsigned int i = 0; 1024 > i; i++)
 								{
-									if(true == client_list[i].enable && true == client_list[i].esp8266)
+									if(true == client_list[i].enable)
 									{
-										if(1 < str_send.size())
-										{
-											str_send += ",";
-										}
+										count++;
 
-										str_send += "{\"key\":\"";
-										str_send += client_list[i].key;
-										str_send += "\",\"ssid\":\"";
-										str_send += client_list[i].ssid;
-										str_send += "\",\"lan_ip\":\"";
-										str_send += client_list[i].lan_ip;
-										str_send += "\",\"global_ip\":\"";
-										str_send += client_list[i].global_ip;
-										str_send += "\"}";
+										if(true == client_list[i].esp8266)
+										{
+											ret = snprintf(buffer, sizeof(buffer), \
+																	"{"
+																	"\"key\":\"%s\","
+																	"\"ssid\":\"%s\","
+																	"\"lan_ip\":\"%s\","
+																	"\"global_ip\":\"%s\""
+																	"}", \
+																	client_list[i].key, \
+																	client_list[i].ssid, \
+																	client_list[i].lan_ip, \
+																	client_list[i].global_ip);
+
+											if(1 < str_send.size())
+											{
+												str_send += ",";
+											}
+
+											str_send += buffer;
+										}
 									}
 								}
 
 								str_send += "]";
+
+								snprintf(buffer, sizeof(buffer), "{\"count\":%u,\"list\":", count);
+
+								str_send = buffer + str_send + "}";
 
 								ret_to_client = true;
 							}

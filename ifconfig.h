@@ -46,6 +46,8 @@ public:
 	static int interfaceSetsockopt(int fd, int ops, int opt);
 	static int interfaceIoctl(const char *ifname, unsigned char *data, int ops);
 
+	static int socket_listen_on(int type, unsigned short port);
+
 private:
 	Lib_IfConfig(void);
 };
