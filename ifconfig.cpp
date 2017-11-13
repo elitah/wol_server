@@ -61,6 +61,15 @@ int Lib_IfConfig::setSocketReUseAddr(int fd)
 	return Lib_IfConfig::interfaceSetsockopt(fd, SO_REUSEADDR, 1);
 }
 
+int Lib_IfConfig::setSocketReUsePort(int fd)
+{
+#if defined(SO_REUSEPORT)
+	return Lib_IfConfig::interfaceSetsockopt(fd, SO_REUSEPORT, 1);
+#else
+	return 0;
+#endif
+}
+
 int Lib_IfConfig::setSocketBroadCast(int fd)
 {
 	return Lib_IfConfig::interfaceSetsockopt(fd, SO_BROADCAST, 1);
@@ -466,6 +475,11 @@ int Lib_IfConfig::socket_listen_on(int type, unsigned short port)
 	}
 
 	if(0 != setSocketReUseAddr(listen_fd))
+	{
+		goto out1;
+	}
+
+	if(0 != setSocketReUsePort(listen_fd))
 	{
 		goto out1;
 	}

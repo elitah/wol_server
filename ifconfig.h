@@ -19,6 +19,7 @@ public:
 
 	static int setSocketNonBlock(int fd);
 	static int setSocketReUseAddr(int fd);
+	static int setSocketReUsePort(int fd);
 	static int setSocketBroadCast(int fd);
 
 	static int setInterfaceIpAddr(const char *ifname, in_addr_t data);

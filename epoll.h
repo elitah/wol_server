@@ -27,7 +27,8 @@ public:
 	void quit(void);
 	bool loop(void);
 
-	void wait(int timeout, void (*handle_call)(void *arg, int fd), void *arg);
+	void wait(int timeout, void (*handle_call)(void *arg, int fd), void *arg = NULL);
+	void wait(int timeout, void (*handle_call)(Lib_Epoll *epoll, int fd, void *arg), void *arg = NULL);
 
 	int waitSingle(int timeout);
 

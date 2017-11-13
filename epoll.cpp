@@ -160,7 +160,22 @@ void Lib_Epoll::wait(int timeout, void (*handle_call)(void *arg, int fd), void *
 	{
 		for(i = 0; epoll_events_count > i; i++)
 		{
-			handle_call(arg, m_events[i].data.fd);
+			handle_call(this, m_events[i].data.fd);
+		}
+	}
+}
+
+void Lib_Epoll::wait(int timeout, void (*handle_call)(Lib_Epoll *epoll, int fd, void *arg), void *arg)
+{
+	int i = 0, epoll_events_count = 0;
+
+	epoll_events_count = epoll_wait(m_fd, m_events, m_count, timeout);
+
+	if(0 < epoll_events_count)
+	{
+		for(i = 0; epoll_events_count > i; i++)
+		{
+			handle_call(this, m_events[i].data.fd, arg);
 		}
 	}
 }
