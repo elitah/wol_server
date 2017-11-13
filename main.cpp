@@ -49,18 +49,14 @@ static unsigned long long int getTimestamp(void)
 	return (((unsigned long long int)ts.tv_sec) * 1000000ULL) + (((unsigned long long int)ts.tv_nsec) / 1000ULL);
 }
 
-static void handle_socket(void *arg, int fd)
+static void handle_socket(Lib_Epoll *epoll, int fd, void *arg)
 {
-	int tmp_fd = -1;
-
-	Lib_Epoll *epoll = (Lib_Epoll *)arg;
-
-	struct client_info *client_list = NULL;
-
-	client_list = (struct client_info *)epoll->getPtr();
+	struct client_info *client_list = (struct client_info *)arg;
 
 	if(true == epoll->checkListen(fd))
 	{
+		int tmp_fd = -1;
+
 		struct sockaddr_in remote_addr;
 		socklen_t len = sizeof(remote_addr);
 
@@ -101,6 +97,7 @@ static void handle_socket(void *arg, int fd)
 		std::string str_recv, str_send;
 
 		bool ret_to_client = false;
+		bool ret_to_ignore = false;
 
 		unsigned long long int recv_start = getTimestamp();
 
@@ -123,7 +120,7 @@ static void handle_socket(void *arg, int fd)
 
 				if(NULL != client_list)
 				{
-					client_list[tmp_fd].enable = false;
+					client_list[fd].enable = false;
 				}
 
 				epoll->del(fd);
@@ -160,7 +157,11 @@ static void handle_socket(void *arg, int fd)
 						{
 							printf("cmd: %s, ", cmd);
 
-							if(0 == strcmp(cmd, "bind"))
+							if(0 == strcmp(cmd, "response"))
+							{
+								ret_to_ignore = true;
+							}
+							else if(0 == strcmp(cmd, "bind"))
 							{
 								char key[32] = {0};
 								char ssid[32] = {0};
@@ -276,6 +277,36 @@ static void handle_socket(void *arg, int fd)
 									}
 								}
 							}
+							else if(0 == strcmp(cmd, "reset"))
+							{
+								char key[32] = {0};
+
+								if(true == json_recv->getValueString("key", key, sizeof(key)))
+								{
+									if(0 < strlen(key))
+									{
+										for(unsigned int i = 0; 1024 > i; i++)
+										{
+											if(true == client_list[i].enable && true == client_list[i].esp8266)
+											{
+												if(0 == strcmp(client_list[i].key, key))
+												{
+													ret = snprintf(buffer, sizeof(buffer), "{\"cmd\":\"reset\"}");
+
+													if(0 < ret)
+													{
+														send(i, buffer, ret, 0);
+
+														ret_to_client = true;
+													}
+
+													break;
+												}
+											}
+										}
+									}
+								}
+							}
 							else if(0 == strcmp(cmd, "beat"))
 							{
 								ret_to_client = true;
@@ -288,24 +319,27 @@ static void handle_socket(void *arg, int fd)
 				}
 			}
 
-			ret = snprintf(buffer, sizeof(buffer), JSON_RET_STR, ret_to_client ? "true" : "false", 0 < str_send.size() ? str_send.c_str() : "null");
-
-			if(0 < ret)
+			if(true != ret_to_ignore)
 			{
-				if(true == ret_to_client)
+				ret = snprintf(buffer, sizeof(buffer), JSON_RET_STR, ret_to_client ? "true" : "false", 0 < str_send.size() ? str_send.c_str() : "null");
+
+				if(0 < ret)
 				{
-					client_list[fd].timestamp = getTimestamp() + 10000000;
+					if(true == ret_to_client)
+					{
+						client_list[fd].timestamp = getTimestamp() + 10000000;
 
-					printf("Response Success! ");
+						printf("Response Success! ");
+					}
+					else
+					{
+						printf("Response Failed! ");
+					}
+
+					send(fd, buffer, ret, 0);
+
+					printf("Time consumption: %llu us\n", getTimestamp() - recv_start);
 				}
-				else
-				{
-					printf("Response Failed! ");
-				}
-
-				send(fd, buffer, ret, 0);
-
-				printf("Time consumption: %llu us\n", getTimestamp() - recv_start);
 			}
 		}
 	}
@@ -451,8 +485,6 @@ int doMainFunc(unsigned short port)
 		client_list[i].enable = false;
 	}
 
-	epoll->setPtr(client_list);
-
 	printf("[Main] start to listen: port: %u\n", port);
 
 	listen_fd = listen_on(port);
@@ -496,7 +528,7 @@ int doMainFunc(unsigned short port)
 			}
 		}
 
-		epoll->wait(1000, handle_socket, epoll);
+		epoll->wait(1000, handle_socket, client_list);
 
 		printf("[Main] client total: %u\n", epoll->size());
 	}
