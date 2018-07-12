@@ -23,13 +23,12 @@ echo 'execute path: '${basedir}
 echo ''
 
 if [ -z $1 ]; then
-  envdir='/etc'
-
   echo -n -e "\033[31;1m是否添加启动项(y): \033[0m"
 
   read -n 1 -t 30 capture_key
 
   if [ ! -z ${capture_key} ] && ([ 'Yx' = ${capture_key}'x' ] || [ 'yx' = ${capture_key}'x' ]); then
+    envdir='/etc'
     echo ''
     echo ''
     echo ''
@@ -54,6 +53,7 @@ if [ -z $1 ]; then
     echo "${basedir}/run.sh start > /dev/null 2>&1 &" >> ${envdir}/rc.local
     echo '' >> ${envdir}/rc.local
     echo 'exit 0' >> ${envdir}/rc.local
+    chmod 0755 ${envdir}/rc.local
   fi
 fi
 
