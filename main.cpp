@@ -277,6 +277,56 @@ static void handle_socket(Lib_Epoll *epoll, int fd, void *arg)
 									}
 								}
 							}
+							else if(0 == strcmp(cmd, "shutdown"))
+							{
+								char key[32] = {0};
+								char mac[32] = {0};
+
+								if(true == json_recv->getValueString("key", key, sizeof(key)) \
+									&& true == json_recv->getValueString("mac", mac, sizeof(mac)))
+								{
+									if(0 < strlen(key) && 0 < strlen(mac))
+									{
+										unsigned int macval_int[6] = {0};
+
+										if(6 == sscanf(mac, "%02x:%02x:%02x:%02x:%02x:%02x", &macval_int[0], &macval_int[1], &macval_int[2], &macval_int[3], &macval_int[4], &macval_int[5])
+											|| 6 == sscanf(mac, "%02x-%02x-%02x-%02x-%02x-%02x", &macval_int[0], &macval_int[1], &macval_int[2], &macval_int[3], &macval_int[4], &macval_int[5]))
+										{
+											unsigned char macval_char[6] = {0};
+
+											macval_char[0] = (unsigned char)(macval_int[0] & 0xFF);
+											macval_char[1] = (unsigned char)(macval_int[1] & 0xFF);
+											macval_char[2] = (unsigned char)(macval_int[2] & 0xFF);
+											macval_char[3] = (unsigned char)(macval_int[3] & 0xFF);
+											macval_char[4] = (unsigned char)(macval_int[4] & 0xFF);
+											macval_char[5] = (unsigned char)(macval_int[5] & 0xFF);
+
+											for(unsigned int i = 0; 1024 > i; i++)
+											{
+												if(true == client_list[i].enable && true == client_list[i].esp8266)
+												{
+													if(0 == strcmp(client_list[i].key, key))
+													{
+														ret = snprintf(buffer, sizeof(buffer), \
+																		"{\"cmd\":\"shutdown_send\",\"mac\":[%u,%u,%u,%u,%u,%u]}", \
+																		macval_char[0], macval_char[1], macval_char[2], \
+																		macval_char[3], macval_char[4], macval_char[5]);
+
+														if(0 < ret)
+														{
+															send(i, buffer, ret, 0);
+
+															ret_to_client = true;
+														}
+
+														break;
+													}
+												}
+											}
+										}
+									}
+								}
+							}
 							else if(0 == strcmp(cmd, "reset"))
 							{
 								char key[32] = {0};
