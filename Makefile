@@ -30,4 +30,14 @@ clean:
 
 distclean:
 	make -C . clean
+
+	@for i in $(shell find . -mindepth 2 -maxdepth 4 -type d -name ".output"); do \
+		rm -rf $$i > /dev/null 2>&1; \
+	done
+
+	@for i in $(shell find . -mindepth 2 -maxdepth 2 -type f -name "Makefile" -exec dirname {} \; | sort); do \
+		sh -c 'make -C '$$i' clean > /dev/null 2>&1; exit 0'; \
+		sh -c 'make -C '$$i' distclean > /dev/null 2>&1; exit 0'; \
+	done
+
 	rm -rf *.so *.a
