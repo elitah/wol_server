@@ -61,7 +61,11 @@ echo ''
 echo ''
 echo ''
 
+if [ -x ${basedir}/notice/run.sh ]; then
+	${basedir}/notice/run.sh
+fi
+
 while [ -x ${basedir}/wol_server ]; do
-  ${basedir}/wol_server -f -p 4000
+  ${basedir}/wol_server -f -p 4000 -w 5000
   sleep 1
 done
