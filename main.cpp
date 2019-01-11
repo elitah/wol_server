@@ -49,6 +49,42 @@ static unsigned long long int getTimestamp(void)
 	return (((unsigned long long int)ts.tv_sec) * 1000000ULL) + (((unsigned long long int)ts.tv_nsec) / 1000ULL);
 }
 
+static void send_udp(const char *ip, unsigned short port, char *data, unsigned int size)
+{
+	if(NULL != ip && 0 < port && NULL != data && 0 < size)
+	{
+		int sock_fd = -1;
+
+		sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+		if(0 <= sock_fd)
+		{
+			int ret = -1;
+
+			struct sockaddr_in addr_serv;
+
+			memset(&addr_serv, 0, sizeof(addr_serv));
+
+			addr_serv.sin_family = AF_INET;
+			addr_serv.sin_addr.s_addr = inet_addr(ip);
+			addr_serv.sin_port = htons(port);
+
+			ret = sendto(sock_fd, data, size, 0, (struct sockaddr *)&addr_serv, sizeof(addr_serv));
+
+			if(0 < ret)
+			{
+				printf("%s: send ok\n", __func__);
+			}
+			else
+			{
+				printf("%s: send failed\n", __func__);
+			}
+
+			close(sock_fd);
+		}
+	}
+}
+
 static void handle_socket(Lib_Epoll *epoll, int fd, void *arg)
 {
 	struct client_info *client_list = (struct client_info *)arg;
@@ -327,6 +363,28 @@ static void handle_socket(Lib_Epoll *epoll, int fd, void *arg)
 									}
 								}
 							}
+							else if(0 == strcmp(cmd, "warn"))
+							{
+								if(true == client_list[fd].enable && true == client_list[fd].esp8266)
+								{
+									void *x = epoll->getPtr();
+
+									if(NULL != x)
+									{
+										unsigned short port = *(unsigned short *)x;
+
+										if(0 < port)
+										{
+											ret = snprintf(buffer, sizeof(buffer), "{\"cmd\":\"send_notice\",\"key\":\"%s\"}", client_list[fd].key);
+
+											if(0 < ret)
+											{
+												send_udp("127.0.0.1", port, buffer, ret);
+											}
+										}
+									}
+								}
+							}
 							else if(0 == strcmp(cmd, "reset"))
 							{
 								char key[32] = {0};
@@ -498,7 +556,7 @@ static int deamon_create(bool print = true)
 	return -1;
 }
 
-int doMainFunc(unsigned short port)
+int doMainFunc(unsigned short port, unsigned short port_warn)
 {
 	Lib_Epoll *epoll = NULL;
 
@@ -553,6 +611,8 @@ int doMainFunc(unsigned short port)
 
 	printf("[Main] add to epoll ok\n");
 
+	epoll->setPtr(&port_warn);
+
 	while(true != exit_flag && epoll->loop())
 	{
 		timestamp = getTimestamp();
@@ -587,6 +647,7 @@ out2:
 	close(listen_fd);
 	listen_fd = -1;
 out1:
+/*
 	{
 		void *ptr = epoll->getPtr();
 
@@ -598,6 +659,7 @@ out1:
 
 		epoll->setPtr(NULL);
 	}
+*/
 	delete epoll;
 	epoll = NULL;
 out:
@@ -611,12 +673,13 @@ int main(int argc, char **argv)
 	int oc = 0;
 
 	unsigned short port = 50173;
+	unsigned short port_warn = 50174;
 
 	bool foreground = false;
 
 	if(1 < argc)
 	{
-		while(0 < (oc = getopt(argc, argv, "fp:")))
+		while(0 < (oc = getopt(argc, argv, "fp:w:")))
 		{
 			switch(oc)
 			{
@@ -629,6 +692,9 @@ int main(int argc, char **argv)
 					{
 						goto out;
 					}
+					break;
+				case 'w':
+					port_warn = (unsigned short)strtoul(optarg, NULL, 0);
 					break;
 				case '?':
 					goto out;
@@ -648,7 +714,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	return doMainFunc(port);
+	return doMainFunc(port, port_warn);
 
 out:
 	return 0;
