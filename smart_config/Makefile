@@ -73,6 +73,7 @@ LINKFLAGS_eagle.app.v6 = \
 	-lairkiss\
 	-lssl \
 	-ljson \
+	-ldriver \
 	$(DEP_LIBS_eagle.app.v6)					\
 	-Wl,--end-group
 

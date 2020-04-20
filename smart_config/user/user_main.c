@@ -24,6 +24,8 @@
 
 #include "esp_common.h"
 
+#include "gpio.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -84,6 +86,8 @@ get_server_ip(const char *domain, char *ip, unsigned int size)
 
 			do
 			{
+				os_printf("%s: gethostbyname(%s)\n", __func__, domain);
+
 				hptr = gethostbyname(domain);
 			} while(NULL == hptr && 30 > retry++);
 
@@ -92,6 +96,8 @@ get_server_ip(const char *domain, char *ip, unsigned int size)
 				memset(ip, 0x0, size);
 
 				snprintf(ip, size - 1, "%u.%u.%u.%u", hptr->h_addr_list[0][0], hptr->h_addr_list[0][1], hptr->h_addr_list[0][2], hptr->h_addr_list[0][3]);
+
+				os_printf("%s: gethostbyname(%s) => %s\n", __func__, domain, ip);
 
 				return true;
 			}
@@ -313,7 +319,7 @@ reset_delay_task(void *pvParameters)
 {
 	vTaskDelay(3000 / portTICK_RATE_MS);
 
-	system_soft_wdt_stop();
+	//system_soft_wdt_stop();
 
 	system_restore();
 	system_restart();
@@ -395,7 +401,7 @@ wol_client_task(void *pvParameters)
 						if(0 == connect(sockfd, (struct sockaddr *)&sock_addr, sizeof(sock_addr)))
 						{
 							// 设置GPIO5为输入
-							gpio_output_set(0, 0, 0, BIT5);
+							GPIO_DIS_OUTPUT(GPIO_ID_PIN(5));
 
 							os_printf("connect to %s:%u ok...\n", inet_ntoa(sock_addr.sin_addr), ntohs(sock_addr.sin_port));
 
@@ -570,7 +576,7 @@ wol_client_task(void *pvParameters)
 										break;
 									}
 
-									if(0 == (gpio_input_get() & BIT5))
+									if(0 == (GPIO_INPUT_GET(GPIO_ID_PIN(5))))
 									{
 										gpio5_count++;
 
@@ -695,12 +701,10 @@ led_task(void *pvParameters)
 	uint32 count_led = 6;
 
 	// 常亮
-	gpio_output_set(0, BIT2, BIT2, 0);
+	GPIO_OUTPUT_SET(GPIO_ID_PIN(2), 0);
 
 	while(1)
 	{
-		gpio_mask = gpio_input_get();
-
 		if(NULL != global_flag)
 		{
 			if(0 == *global_flag)
@@ -710,17 +714,17 @@ led_task(void *pvParameters)
 				if(0 == count_led % 8)
 				{
 					// 当前是否处于亮状态
-					if(0 == (gpio_mask & BIT2))
+					if(0 == GPIO_INPUT_GET(GPIO_ID_PIN(2)))
 					{
 						// 是，灭灯
-						gpio_output_set(BIT2, 0, BIT2, 0);
+						GPIO_OUTPUT_SET(GPIO_ID_PIN(2), 1);
 
 						count_led = 0;
 					}
 					else
 					{
 						// 否，点亮
-						gpio_output_set(0, BIT2, BIT2, 0);
+						GPIO_OUTPUT_SET(GPIO_ID_PIN(2), 0);
 
 						count_led = 6;
 					}
@@ -731,18 +735,18 @@ led_task(void *pvParameters)
 			else
 			{
 				// 常亮
-				gpio_output_set(0, BIT2, BIT2, 0);
+				GPIO_OUTPUT_SET(GPIO_ID_PIN(2), 0);
 			}
 		}
 		else
 		{
-			if(0 == (gpio_mask & BIT2))
+			if(0 == GPIO_INPUT_GET(GPIO_ID_PIN(2)))
 			{
-				gpio_output_set(BIT2, 0, BIT2, 0);
+				GPIO_OUTPUT_SET(GPIO_ID_PIN(2), 1);
 			}
 			else
 			{
-				gpio_output_set(0, BIT2, BIT2, 0);
+				GPIO_OUTPUT_SET(GPIO_ID_PIN(2), 0);
 			}
 
 			vTaskDelay(50 / portTICK_RATE_MS);
@@ -808,17 +812,13 @@ smartconfig_task(void *pvParameters)
 void ICACHE_FLASH_ATTR
 button_task(void *pvParameters)
 {
-	uint32 gpio_mask = 0x0;
-
 	uint32 count_btn = 0;
 
-	gpio_output_set(0, 0, 0, BIT0);
+	GPIO_DIS_OUTPUT(GPIO_ID_PIN(0));
 
 	while(1)
 	{
-		gpio_mask = gpio_input_get();
-
-		if(0 == (gpio_mask & BIT0))
+		if(0 == GPIO_INPUT_GET(GPIO_ID_PIN(0)))
 		{
 			if(0 == count_btn)
 			{
@@ -839,7 +839,7 @@ button_task(void *pvParameters)
 
 		if(3 <= (count_btn / 10))
 		{
-			system_soft_wdt_stop();
+			//system_soft_wdt_stop();
 
 			system_restore();
 			system_restart();
