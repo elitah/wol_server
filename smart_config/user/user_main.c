@@ -72,6 +72,36 @@ generateKey(unsigned char *key, unsigned int size)
 }
 
 bool ICACHE_FLASH_ATTR
+get_server_ip(const char *domain, char *ip, unsigned int size)
+{
+	if(NULL != domain && NULL != ip)
+	{
+		if(0 < strlen(domain))
+		{
+			int retry = 0;
+
+			struct hostent *hptr = NULL;
+
+			do
+			{
+				hptr = gethostbyname(domain);
+			} while(NULL == hptr && 30 > retry++);
+
+			if(NULL != hptr && 4 == hptr->h_length)
+			{
+				memset(ip, 0x0, size);
+
+				snprintf(ip, size - 1, "%u.%u.%u.%u", hptr->h_addr_list[0][0], hptr->h_addr_list[0][1], hptr->h_addr_list[0][2], hptr->h_addr_list[0][3]);
+
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+bool ICACHE_FLASH_ATTR
 json_get_value_array(cJSON *pRoot, const char *name, unsigned char *buf, unsigned int size)
 {
 	unsigned int i = 0;
@@ -338,11 +368,20 @@ wol_client_task(void *pvParameters)
 				{
 					if(0 == setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)))
 					{
+						if(true != get_server_ip("example.com", ip, sizeof(ip)))
+						{
+							os_printf("%s: unable get server ip address by: example.com\n", __func__);
+
+							vTaskDelay(1000 / portTICK_RATE_MS);
+
+							continue;
+						}
+
 						memset(&sock_addr, 0, sizeof(sock_addr));
 
 						sock_addr.sin_family = AF_INET;
-						sock_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-						sock_addr.sin_port = htons(4000);
+						sock_addr.sin_addr.s_addr = inet_addr(ip);
+						sock_addr.sin_port = htons(8888);
 
 						timestamp_send_bind = 0;
 						timestamp_send_beat = 0;
