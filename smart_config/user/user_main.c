@@ -24,6 +24,8 @@
 
 #include "esp_common.h"
 
+#include "user_config.h"
+
 #include "gpio.h"
 
 #include "freertos/FreeRTOS.h"
@@ -340,7 +342,9 @@ wol_client_task(void *pvParameters)
 
 	unsigned int retry_count = 0;
 
-	unsigned int gpio5_count = 0;
+#if defined(IO_WARN_TO_PINID)
+	unsigned int io_warn_count = 0;
+#endif
 
 	char buffer[256] = {0};
 
@@ -358,7 +362,7 @@ wol_client_task(void *pvParameters)
 	struct ip_info info;
 	struct station_config sta_con;
 
-	char ip[16] = {0};
+	char ip[32] = {0};
 
 	cJSON *pRoot = NULL;
 
@@ -374,9 +378,9 @@ wol_client_task(void *pvParameters)
 				{
 					if(0 == setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)))
 					{
-						if(true != get_server_ip("example.com", ip, sizeof(ip)))
+						if(true != get_server_ip(SERVICE_ADDRESS, ip, sizeof(ip)))
 						{
-							os_printf("%s: unable get server ip address by: example.com\n", __func__);
+							os_printf("%s: unable get server ip address by: %s\n", __func__, SERVICE_ADDRESS);
 
 							vTaskDelay(1000 / portTICK_RATE_MS);
 
@@ -387,7 +391,7 @@ wol_client_task(void *pvParameters)
 
 						sock_addr.sin_family = AF_INET;
 						sock_addr.sin_addr.s_addr = inet_addr(ip);
-						sock_addr.sin_port = htons(8888);
+						sock_addr.sin_port = htons(SERVICE_PORT);
 
 						timestamp_send_bind = 0;
 						timestamp_send_beat = 0;
@@ -400,9 +404,10 @@ wol_client_task(void *pvParameters)
 
 						if(0 == connect(sockfd, (struct sockaddr *)&sock_addr, sizeof(sock_addr)))
 						{
-							// 设置GPIO5为输入
-							GPIO_DIS_OUTPUT(GPIO_ID_PIN(5));
-
+#if defined(IO_WARN_TO_PINID)
+							// 设置报警引脚为输入
+							GPIO_DIS_OUTPUT(IO_WARN_TO_PINID);
+#endif
 							os_printf("connect to %s:%u ok...\n", inet_ntoa(sock_addr.sin_addr), ntohs(sock_addr.sin_port));
 
 							retry_count = 0;
@@ -575,14 +580,14 @@ wol_client_task(void *pvParameters)
 
 										break;
 									}
-
-									if(0 == (GPIO_INPUT_GET(GPIO_ID_PIN(5))))
+#if defined(IO_WARN_TO_PINID)
+									if(0 == (GPIO_INPUT_GET(IO_WARN_TO_PINID)))
 									{
-										gpio5_count++;
+										io_warn_count++;
 
-										os_printf("gpio5: warn %u\n", gpio5_count);
+										os_printf("io_warn: warn %u\n", io_warn_count);
 
-										if(3 <= gpio5_count)
+										if(3 <= io_warn_count)
 										{
 											ret = snprintf(buffer, sizeof(buffer), "{\"cmd\":\"warn\"}");
 
@@ -592,19 +597,20 @@ wol_client_task(void *pvParameters)
 
 												if(0 < ret)
 												{
-													os_printf("gpio5: warn send ok\n");
+													os_printf("io_warn: warn send ok\n");
 												}
 												else
 												{
-													os_printf("gpio5: warn send failed\n");
+													os_printf("io_warn: warn send failed\n");
 												}
 											}
 
-											gpio5_count = 0;
+											io_warn_count = 0;
 										}
 									} else {
-										gpio5_count = 0;
+										io_warn_count = 0;
 									}
+#endif
 								}
 							}
 
@@ -696,12 +702,13 @@ send_key_task(void *pvParameters)
 void ICACHE_FLASH_ATTR
 led_task(void *pvParameters)
 {
+#if defined(IO_LED_TO_PINID)
 	uint32 gpio_mask = 0x0;
 
 	uint32 count_led = 6;
 
 	// 常亮
-	GPIO_OUTPUT_SET(GPIO_ID_PIN(2), 0);
+	GPIO_OUTPUT_SET(IO_LED_TO_PINID, 0);
 
 	while(1)
 	{
@@ -714,17 +721,17 @@ led_task(void *pvParameters)
 				if(0 == count_led % 8)
 				{
 					// 当前是否处于亮状态
-					if(0 == GPIO_INPUT_GET(GPIO_ID_PIN(2)))
+					if(0 == GPIO_INPUT_GET(IO_LED_TO_PINID))
 					{
 						// 是，灭灯
-						GPIO_OUTPUT_SET(GPIO_ID_PIN(2), 1);
+						GPIO_OUTPUT_SET(IO_LED_TO_PINID, 1);
 
 						count_led = 0;
 					}
 					else
 					{
 						// 否，点亮
-						GPIO_OUTPUT_SET(GPIO_ID_PIN(2), 0);
+						GPIO_OUTPUT_SET(IO_LED_TO_PINID, 0);
 
 						count_led = 6;
 					}
@@ -735,24 +742,24 @@ led_task(void *pvParameters)
 			else
 			{
 				// 常亮
-				GPIO_OUTPUT_SET(GPIO_ID_PIN(2), 0);
+				GPIO_OUTPUT_SET(IO_LED_TO_PINID, 0);
 			}
 		}
 		else
 		{
-			if(0 == GPIO_INPUT_GET(GPIO_ID_PIN(2)))
+			if(0 == GPIO_INPUT_GET(IO_LED_TO_PINID))
 			{
-				GPIO_OUTPUT_SET(GPIO_ID_PIN(2), 1);
+				GPIO_OUTPUT_SET(IO_LED_TO_PINID, 1);
 			}
 			else
 			{
-				GPIO_OUTPUT_SET(GPIO_ID_PIN(2), 0);
+				GPIO_OUTPUT_SET(IO_LED_TO_PINID, 0);
 			}
 
 			vTaskDelay(50 / portTICK_RATE_MS);
 		}
 	}
-
+#endif
 	vTaskDelete(NULL);
 }
 
@@ -812,13 +819,14 @@ smartconfig_task(void *pvParameters)
 void ICACHE_FLASH_ATTR
 button_task(void *pvParameters)
 {
+#if defined(IO_RESET_TO_PINID)
 	uint32 count_btn = 0;
 
-	GPIO_DIS_OUTPUT(GPIO_ID_PIN(0));
+	GPIO_DIS_OUTPUT(IO_RESET_TO_PINID);
 
 	while(1)
 	{
-		if(0 == GPIO_INPUT_GET(GPIO_ID_PIN(0)))
+		if(0 == GPIO_INPUT_GET(IO_RESET_TO_PINID))
 		{
 			if(0 == count_btn)
 			{
@@ -851,7 +859,7 @@ button_task(void *pvParameters)
 	}
 
 	os_printf("Reset Config, Reboot...\n");
-
+#endif
 	vTaskDelete(NULL);
 }
 
@@ -992,6 +1000,10 @@ user_init(void)
 {
 	unsigned int flash_size = user_get_flash_size();
 
+#if defined(IO_INIT_FUNC)
+	IO_INIT_FUNC();
+#endif
+
 	os_printf("SDK version:%s\n", system_get_sdk_version());
 
 	if(0x100000 > flash_size)
@@ -1023,5 +1035,7 @@ user_init(void)
 		}
 	}
 
+#if defined(IO_LED_TO_PINID)
 	xTaskCreate(led_task, "led_task", 512, NULL, 2, NULL);
+#endif
 }
